@@ -56,20 +56,43 @@ class SoundSystem:
         if sound_spec in self.sounds:
             return self.sounds[sound_spec]
 
-        # If not, check if it's a direct path
-        if sound_spec.endswith('.wav'):
-            # Try different path possibilities
-            possibilities = [
-                sound_spec,  # Absolute path
-                os.path.join(self.sound_dir, sound_spec),  # Relative to sound dir
-                os.path.expanduser(sound_spec)  # Expand user directory
-            ]
+        # List of possible paths to try
+        possible_paths = [
+            sound_spec,  # Absolute path
+            os.path.join(self.sound_dir, f"{sound_spec}.wav"),  # Without .wav extension
+            os.path.join(self.sound_dir, sound_spec),  # With or without .wav extension
+            os.path.expanduser(sound_spec)  # Expand user directory if used
+        ]
 
-            for path in possibilities:
-                if self._verify_sound_file(path):
-                    return path
+        # Try each possible path
+        for path in possible_paths:
+            if self._verify_sound_file(path):
+                return path
 
+        # If we get here, no valid sound file was found
         return None
+
+    def cmd_SOUND_LIST(self, gcmd):
+        """List all available sounds"""
+        msg = ["Available sounds:\n"]
+
+        # List predefined sounds
+        msg.append("Predefined sounds:")
+        for sound_id, path in sorted(self.sounds.items()):
+            status = "✓" if self._verify_sound_file(path) else "✗"
+            msg.append(f"{status} {sound_id}: {path}")
+
+        # List all WAV files in sound directory
+        msg.append("\nAvailable WAV files:")
+        if os.path.exists(self.sound_dir):
+            wav_files = [f for f in os.listdir(self.sound_dir) if f.endswith('.wav')]
+            for wav_file in sorted(wav_files):
+                path = os.path.join(self.sound_dir, wav_file)
+                status = "✓" if self._verify_sound_file(path) else "✗"
+                msg.append(f"{status} {wav_file}")
+
+        msg.append(f"\nSound directory: {self.sound_dir}")
+        gcmd.respond_info("\n".join(msg))
 
     async def _play_sound_async(self, sound_path):
         """Asynchronously play a sound file using aplay"""
@@ -125,29 +148,6 @@ class SoundSystem:
         )
 
     cmd_SOUND_LIST_help = "List all available predefined sounds and sound directory location"
-
-    def cmd_SOUND_LIST(self, gcmd):
-        """List all available sounds"""
-        msg = ["Available predefined sounds:"]
-        for sound_id, path in sorted(self.sounds.items()):
-            status = "✓" if self._verify_sound_file(path) else "✗"
-            msg.append(f"{status} {sound_id}: {path}")
-
-        msg.append("\nSound directory location:")
-        msg.append(f"  {self.sound_dir}")
-
-        # List any additional WAV files in sound directory
-        if os.path.exists(self.sound_dir):
-            custom_sounds = [f for f in os.listdir(self.sound_dir)
-                             if f.endswith('.wav') and
-                             os.path.join(self.sound_dir, f) not in self.sounds.values()]
-            if custom_sounds:
-                msg.append("\nAdditional WAV files in sound directory:")
-                for sound_file in sorted(custom_sounds):
-                    msg.append(f"  {sound_file}")
-
-        gcmd.respond_info("\n".join(msg))
-
 
 def load_config(config):
     return SoundSystem(config)
