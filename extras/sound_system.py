@@ -1,3 +1,6 @@
+import os
+
+
 def __init__(self, config):
     self.printer = config.get_printer()
     self.gcode = self.printer.lookup_object('gcode')
@@ -13,7 +16,6 @@ def __init__(self, config):
         'print_cancel': os.path.join(self.sound_dir, 'print_cancel.wav'),
         'error': os.path.join(self.sound_dir, 'error.wav')
     }
-
 
 def _verify_sound_file(self, sound_path):
     """Verify sound file exists and is accessible"""
