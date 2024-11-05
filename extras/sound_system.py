@@ -101,6 +101,7 @@ class SoundSystem:
     def cmd_PLAY_SOUND(self, gcmd):
         """Handle PLAY_SOUND command"""
         sound_spec = gcmd.get('SOUND')
+        logging.info(f"Attempting to play sound: {sound_spec}")
         if not sound_spec:
             raise gcmd.error("No sound specified")
 
@@ -125,6 +126,11 @@ class SoundSystem:
         gcmd.respond_info(f"Playing sound: {sound_path}")
 
     async def _play_sound_async(self, sound_path):
+        logging.info(f"Starting async sound playback: {sound_path}")
+        if not self.aplay_path:
+            logging.error("SoundSystem: aplay not available")
+            return
+        logging.info(f"Using aplay at: {self.aplay_path}")
         """Asynchronously play a sound file using aplay"""
         if not self.aplay_path:
             logging.error("SoundSystem: aplay not available")
