@@ -131,12 +131,20 @@ class SoundSystem:
             return
 
         try:
+            # Remove DEVNULL to see potential errors
             process = await asyncio.create_subprocess_exec(
                 self.aplay_path, sound_path,
-                stdout=DEVNULL,
-                stderr=DEVNULL
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
             )
-            await process.wait()
+            stdout, stderr = await process.communicate()
+            if stderr:
+                logging.error(f"aplay stderr: {stderr.decode()}")
+            if stdout:
+                logging.info(f"aplay stdout: {stdout.decode()}")
+            return_code = await process.wait()
+            if return_code != 0:
+                logging.error(f"aplay failed with return code {return_code}")
         except Exception as e:
             logging.exception(f"Error playing sound {sound_path}: {str(e)}")
 
