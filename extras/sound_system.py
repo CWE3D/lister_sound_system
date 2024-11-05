@@ -136,11 +136,33 @@ class SoundSystem:
         # Log playback attempt
         self.logger.info(f"Attempting to play sound: {sound_path}")
 
-        # Schedule sound playback asynchronously
+        # Use synchronous playback instead
+        def play_sound(eventtime):
+            self.logger.info(f"Starting sound playback for: {sound_path}")
+            try:
+                # Execute aplay directly
+                cmd = [self.aplay_path, '-D', 'plughw:0,0', sound_path]
+                self.logger.debug(f"Executing command: {' '.join(cmd)}")
+
+                process = os.popen(f"{' '.join(cmd)} 2>&1")
+                output = process.read()
+                return_code = process.close()
+
+                if output:
+                    self.logger.debug(f"aplay output: {output}")
+
+                if return_code is not None:
+                    self.logger.error(f"aplay failed with return code {return_code}")
+                else:
+                    self.logger.info("Sound playback completed successfully")
+
+            except Exception as e:
+                self.logger.exception(f"Error playing sound {sound_path}: {str(e)}")
+
+        # Schedule the synchronous playback
         reactor = self.printer.get_reactor()
-        reactor.register_async_callback(
-            lambda e: self._play_sound_async(sound_path)
-        )
+        reactor.register_callback(play_sound)
+
         self.logger.info("Sound playback scheduled")
         gcmd.respond_info(f"Playing sound: {sound_path}")
 
