@@ -1,10 +1,8 @@
-# At the top of sound_system.py, add/modify the imports:
 import os
 import asyncio
 import logging
 from subprocess import DEVNULL
 from datetime import datetime
-
 
 class SoundSystem:
     def __init__(self, config):
@@ -14,7 +12,7 @@ class SoundSystem:
         self.printer = config.get_printer()
         self.gcode = self.printer.lookup_object('gcode')
 
-        # Register config option
+        # Register config option properly
         self.sound_dir = config.get('sound_directory',
                                     "/home/pi/lister_sound_system/sounds")
         self.logger.info(f"Sound directory set to: {self.sound_dir}")
@@ -32,7 +30,19 @@ class SoundSystem:
         else:
             self.logger.info(f"Found aplay at: {self.aplay_path}")
 
-    # Also add the config option registration
+        # Register commands
+        self.gcode.register_command(
+            'PLAY_SOUND',
+            self.cmd_PLAY_SOUND,
+            desc=self.cmd_PLAY_SOUND_help
+        )
+
+        self.gcode.register_command(
+            'SOUND_LIST',
+            self.cmd_SOUND_LIST,
+            desc=self.cmd_SOUND_LIST_help
+        )
+
     def get_status(self, eventtime):
         return {
             'sound_directory': self.sound_dir
@@ -95,6 +105,8 @@ class SoundSystem:
 
         self.logger.warning(f"No valid sound file found for: {sound_spec}")
         return None
+
+    cmd_PLAY_SOUND_help = "Play a sound file (e.g., PLAY_SOUND SOUND=print_complete)"
 
     def cmd_PLAY_SOUND(self, gcmd):
         """Handle PLAY_SOUND command"""
@@ -168,6 +180,8 @@ class SoundSystem:
         except Exception as e:
             self.logger.exception(f"Error playing sound {sound_path}: {str(e)}")
 
+    cmd_SOUND_LIST_help = "List all available sounds"
+
     def cmd_SOUND_LIST(self, gcmd):
         """List all available sounds"""
         self.logger.info("Executing SOUND_LIST command")
@@ -202,11 +216,5 @@ class SoundSystem:
         gcmd.respond_info(response)
 
 
-CONFIG_OPTIONS = {
-    'sound_directory': None,  # Optional, has default value
-}
-
 def load_config(config):
-    for option in CONFIG_OPTIONS:
-        config.get_name_from_objects().add_option(option, CONFIG_OPTIONS[option])
     return SoundSystem(config)
