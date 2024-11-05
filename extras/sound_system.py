@@ -8,15 +8,15 @@ from datetime import datetime
 
 class SoundSystem:
     def __init__(self, config):
-        # Set up dedicated logging first thing
         self._setup_logging()
         self.logger.info("Initializing Lister Sound System...")
 
         self.printer = config.get_printer()
         self.gcode = self.printer.lookup_object('gcode')
 
-        # Log configuration details
-        self.sound_dir = "/home/pi/lister_sound_system/sounds"
+        # Register config option
+        self.sound_dir = config.get('sound_directory',
+                                    "/home/pi/lister_sound_system/sounds")
         self.logger.info(f"Sound directory set to: {self.sound_dir}")
 
         # Default sounds mapping with absolute paths
@@ -31,6 +31,12 @@ class SoundSystem:
             self.logger.error("'aplay' not found in system path")
         else:
             self.logger.info(f"Found aplay at: {self.aplay_path}")
+
+    # Also add the config option registration
+    def get_status(self, eventtime):
+        return {
+            'sound_directory': self.sound_dir
+        }
 
     def _setup_logging(self):
         """Set up dedicated logging for the sound system"""
@@ -196,5 +202,11 @@ class SoundSystem:
         gcmd.respond_info(response)
 
 
+CONFIG_OPTIONS = {
+    'sound_directory': None,  # Optional, has default value
+}
+
 def load_config(config):
+    for option in CONFIG_OPTIONS:
+        config.get_name_from_objects().add_option(option, CONFIG_OPTIONS[option])
     return SoundSystem(config)
