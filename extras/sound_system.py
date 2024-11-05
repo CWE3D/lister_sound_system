@@ -133,7 +133,7 @@ class SoundSystem:
         try:
             # Remove DEVNULL to see potential errors
             process = await asyncio.create_subprocess_exec(
-                self.aplay_path, sound_path,
+                self.aplay_path, "-D", "plughw:0,0", sound_path,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE
             )
