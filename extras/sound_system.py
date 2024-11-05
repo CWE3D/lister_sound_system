@@ -16,10 +16,10 @@ class SoundSystem:
 
         # Default sounds mapping with absolute paths
         self.sounds = {
-            'print_start': os.path.join(self.sound_dir, 'print_start.wav'),
-            'print_complete': os.path.join(self.sound_dir, 'print_complete.wav'),
-            'print_cancel': os.path.join(self.sound_dir, 'print_cancel.wav'),
-            'error': os.path.join(self.sound_dir, 'error.wav'),
+            # 'print_start': os.path.join(self.sound_dir, 'print_start.wav'),
+            # 'print_complete': os.path.join(self.sound_dir, 'print_complete.wav'),
+            # 'print_cancel': os.path.join(self.sound_dir, 'print_cancel.wav'),
+            # 'error': os.path.join(self.sound_dir, 'error.wav'),
             'startup': os.path.join(self.sound_dir, 'startup.wav')
         }
 
