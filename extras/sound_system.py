@@ -11,7 +11,12 @@ class SoundSystem:
         self.printer = config.get_printer()
         self.gcode = self.printer.lookup_object('gcode')
 
-        # Use absolute path - we know exactly where it is
+        # Accept config but use our absolute path
+        # Note: We still accept the config to make it a valid section
+        self.sound_dir = config.get('sound_directory',
+                                    "/home/pi/lister_sound_system/sounds")
+
+        # Force the absolute path regardless of config
         self.sound_dir = "/home/pi/lister_sound_system/sounds"
 
         # Default sounds mapping with absolute paths
