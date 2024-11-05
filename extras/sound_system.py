@@ -148,16 +148,34 @@ class SoundSystem:
         """Asynchronously play a sound file using aplay"""
         self.logger.info(f"Starting async sound playback for: {sound_path}")
 
+        # Log user and group information
+        import pwd
+        import grp
+        current_uid = os.getuid()
+        current_gid = os.getgid()
+        current_user = pwd.getpwuid(current_uid).pw_name
+        current_groups = [g.gr_name for g in grp.getgrall() if current_user in g.gr_mem]
+
+        self.logger.info(f"Running as user: {current_user} (UID: {current_uid})")
+        self.logger.info(f"Primary group ID: {current_gid}")
+        self.logger.info(f"User groups: {current_groups}")
+
         if not self.aplay_path:
             self.logger.error("aplay not available")
             return
 
         try:
-            self.logger.debug(f"Executing: {self.aplay_path} {sound_path}")
+            # Use the exact same device specification that worked with speaker-test
+            cmd = [
+                self.aplay_path,
+                '-D', 'plughw:0,0',
+                sound_path
+            ]
+            self.logger.debug(f"Executing command: {' '.join(cmd)}")
 
             # Create process with pipe for output
             process = await asyncio.create_subprocess_exec(
-                self.aplay_path, sound_path,
+                *cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE
             )
