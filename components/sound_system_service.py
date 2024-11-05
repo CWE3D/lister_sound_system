@@ -63,12 +63,18 @@ class SoundSystemService:
         """Verify if file exists and is a valid WAV file"""
         try:
             if not os.path.isfile(path):
+                logging.debug(f"File does not exist: {path}")
                 return False
             # Basic WAV header check
             with open(path, 'rb') as f:
-                header = f.read(4)
-                return header == b'RIFF'
-        except Exception:
+                header = f.read(12)
+                if not (header.startswith(b'RIFF') and header[8:12] == b'WAVE'):
+                    logging.debug(f"Invalid WAV header in file: {path}")
+                    return False
+                logging.debug(f"Valid WAV file found: {path}")
+                return True
+        except Exception as e:
+            logging.debug(f"Error verifying sound file {path}: {str(e)}")
             return False
 
     async def _scan_sounds(self) -> Dict[str, str]:
@@ -116,25 +122,33 @@ class SoundSystemService:
     async def _handle_play_request(self, web_request) -> Dict[str, Any]:
         """Handle request to play a sound"""
         sound = web_request.get_str('sound')
+        logging.info(f"Received play request for sound: {sound}")
 
         try:
+            # Log the command we're about to send
+            cmd = f"PLAY_SOUND SOUND={sound}"
+            logging.info(f"Sending command to Klipper: {cmd}")
+
             # Attempt to play sound through Klipper
             await self.klippy.run_method(
                 "gcode/script",
-                {"script": f"PLAY_SOUND SOUND={sound}"}
+                {"script": cmd}
             )
+            logging.info(f"Successfully sent play command for {sound}")
 
             # Notify clients that sound was played
             await self.server.send_event(
                 "sound_system:sound_played",
                 {'sound': sound}
             )
+            logging.info(f"Sent sound_played event for {sound}")
 
             return {
                 'status': 'success',
                 'sound': sound
             }
         except Exception as e:
+            logging.exception(f"Failed to play sound {sound}")
             raise self.server.error(f"Failed to play sound: {str(e)}")
 
     async def _handle_scan_request(self, web_request) -> Dict[str, Any]:
