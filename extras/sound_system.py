@@ -57,10 +57,13 @@ class SoundSystem:
             if result.returncode == 0:
                 # Parse the output to get current volume percentage
                 output = result.stdout
-                if 'Playback' in output and '[' in output and '%]' in output:
+                if 'Mono:' in output:
                     try:
-                        volume_str = output.split('[')[1].split('%]')[0]
-                        self._current_volume = int(volume_str)
+                        # Find the line with 'Mono: Playback'
+                        mono_line = [line for line in output.split('\n') if 'Mono:' in line][0]
+                        # Extract the percentage value
+                        percentage = int(mono_line.split('[')[1].split('%]')[0])
+                        self._current_volume = percentage
                         self.logger.info(f"Initial volume state: {self._current_volume}%")
                     except (IndexError, ValueError) as e:
                         self.logger.error(f"Error parsing volume output: {e}")
