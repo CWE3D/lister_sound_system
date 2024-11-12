@@ -3,6 +3,7 @@ import logging
 import subprocess
 from pathlib import Path
 from threading import Thread
+from typing import Optional
 
 
 class SoundSystem:
@@ -19,6 +20,12 @@ class SoundSystem:
                                          '/home/pi/lister_sound_system/sounds')).resolve()
         self.logger.info(f"Sound directory: {self.sound_dir}")
 
+        # Volume control configuration
+        self.volume_step = config.getint('volume_step', 5)  # Default 5% steps
+        self.max_volume = config.getint('max_volume', 100)
+        self.min_volume = config.getint('min_volume', 0)
+        self._current_volume = None  # Will be initialized when first needed
+
         # Find aplay and amixer
         self.aplay_path = self._get_aplay_path()
         self.amixer_path = self._get_amixer_path()
@@ -29,15 +36,59 @@ class SoundSystem:
             self.logger.error("'amixer' not found in system path")
             return
 
+        # Initialize volume state
+        self._init_volume_state()
+
         # Register commands
         self.gcode.register_command('PLAY_SOUND', self.cmd_PLAY_SOUND,
                                     desc="Play a sound file (PLAY_SOUND SOUND=filename)")
         self.gcode.register_command('SOUND_LIST', self.cmd_SOUND_LIST,
                                     desc="List available sound files")
         self.gcode.register_command('VOLUME_UP', self.cmd_VOLUME_UP,
-                                    desc="Increase PCM volume by 2%")
+                                    desc=f"Increase PCM volume by {self.volume_step}%")
         self.gcode.register_command('VOLUME_DOWN', self.cmd_VOLUME_DOWN,
-                                    desc="Decrease PCM volume by 2%")
+                                    desc=f"Decrease PCM volume by {self.volume_step}%")
+
+    def _init_volume_state(self):
+        """Initialize volume state by getting current system volume"""
+        try:
+            cmd = [self.amixer_path, '-M', 'sget', 'PCM']
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode == 0:
+                # Parse the output to get current volume percentage
+                output = result.stdout
+                if 'Playback' in output and '[' in output and '%]' in output:
+                    try:
+                        volume_str = output.split('[')[1].split('%]')[0]
+                        self._current_volume = int(volume_str)
+                        self.logger.info(f"Initial volume state: {self._current_volume}%")
+                    except (IndexError, ValueError) as e:
+                        self.logger.error(f"Error parsing volume output: {e}")
+                        self._current_volume = 50  # Default to 50% if parsing fails
+        except Exception as e:
+            self.logger.error(f"Error getting initial volume state: {e}")
+            self._current_volume = 50  # Default to 50% if command fails
+
+    def _set_volume(self, volume: int) -> bool:
+        """Set absolute volume level"""
+        volume = max(self.min_volume, min(self.max_volume, volume))  # Clamp value
+        try:
+            cmd = [self.amixer_path, '-M', 'sset', 'PCM', f'{volume}%']
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+
+            if result.returncode == 0:
+                self._current_volume = volume
+                return True
+            else:
+                self.logger.error(f"Volume set failed: {result.stderr}")
+                return False
+
+        except subprocess.TimeoutExpired:
+            self.logger.error("Volume set timeout")
+            return False
+        except Exception as e:
+            self.logger.error(f"Volume set error: {e}")
+            return False
 
     def _setup_logger(self):
         """Configure dedicated logger for sound system"""
@@ -86,7 +137,7 @@ class SoundSystem:
             self.logger.error(f"Error verifying {path}: {e}")
             return False
 
-    def _find_sound_file(self, sound_name: str) -> Path:
+    def _find_sound_file(self, sound_name: str) -> Optional[Path]:
         """Find sound file by name, with or without .wav extension"""
         sound_path = self.sound_dir / sound_name
 
@@ -100,43 +151,6 @@ class SoundSystem:
             return wav_path
 
         return None
-
-    def _adjust_volume(self, increase: bool):
-        """Adjust PCM volume"""
-        if not self.amixer_path:
-            self.logger.error("amixer not available")
-            return False
-
-        try:
-            cmd = [self.amixer_path, 'set', 'PCM', '2%+' if increase else '2%-']
-            process = subprocess.run(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                timeout=5
-            )
-
-            if process.returncode != 0:
-                self.logger.error(f"Volume adjustment failed: {process.stderr}")
-                return False
-
-            # Extract current volume from amixer output
-            output = process.stdout
-            if 'Playback' in output:
-                try:
-                    volume = output.split('[')[1].split('%')[0]
-                    return f"Volume set to {volume}%"
-                except:
-                    return "Volume adjusted"
-            return "Volume adjusted"
-
-        except subprocess.TimeoutExpired:
-            self.logger.error("Volume adjustment timeout")
-            return False
-        except Exception as e:
-            self.logger.error(f"Volume adjustment error: {e}")
-            return False
 
     def _play_sound_thread(self, sound_path: Path):
         """Handle sound playback in a separate thread"""
@@ -209,17 +223,23 @@ class SoundSystem:
 
     def cmd_VOLUME_UP(self, gcmd):
         """Increase PCM volume"""
-        result = self._adjust_volume(True)
-        if result:
-            gcmd.respond_info(result)
+        if self._current_volume is None:
+            self._init_volume_state()
+
+        new_volume = self._current_volume + self.volume_step
+        if self._set_volume(new_volume):
+            gcmd.respond_info(f"Volume set to {self._current_volume}%")
         else:
             raise gcmd.error("Volume adjustment failed")
 
     def cmd_VOLUME_DOWN(self, gcmd):
         """Decrease PCM volume"""
-        result = self._adjust_volume(False)
-        if result:
-            gcmd.respond_info(result)
+        if self._current_volume is None:
+            self._init_volume_state()
+
+        new_volume = self._current_volume - self.volume_step
+        if self._set_volume(new_volume):
+            gcmd.respond_info(f"Volume set to {self._current_volume}%")
         else:
             raise gcmd.error("Volume adjustment failed")
 
