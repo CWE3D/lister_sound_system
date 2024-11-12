@@ -19,10 +19,14 @@ class SoundSystem:
                                          '/home/pi/lister_sound_system/sounds')).resolve()
         self.logger.info(f"Sound directory: {self.sound_dir}")
 
-        # Find aplay
+        # Find aplay and amixer
         self.aplay_path = self._get_aplay_path()
+        self.amixer_path = self._get_amixer_path()
         if not self.aplay_path:
             self.logger.error("'aplay' not found in system path")
+            return
+        if not self.amixer_path:
+            self.logger.error("'amixer' not found in system path")
             return
 
         # Register commands
@@ -30,6 +34,10 @@ class SoundSystem:
                                     desc="Play a sound file (PLAY_SOUND SOUND=filename)")
         self.gcode.register_command('SOUND_LIST', self.cmd_SOUND_LIST,
                                     desc="List available sound files")
+        self.gcode.register_command('VOLUME_UP', self.cmd_VOLUME_UP,
+                                    desc="Increase PCM volume by 2%")
+        self.gcode.register_command('VOLUME_DOWN', self.cmd_VOLUME_DOWN,
+                                    desc="Decrease PCM volume by 2%")
 
     def _setup_logger(self):
         """Configure dedicated logger for sound system"""
@@ -52,6 +60,15 @@ class SoundSystem:
                                            text=True).strip()
         except subprocess.SubprocessError as e:
             self.logger.error(f"Error finding aplay: {e}")
+            return None
+
+    def _get_amixer_path(self):
+        """Find amixer executable path"""
+        try:
+            return subprocess.check_output(['which', 'amixer'],
+                                           text=True).strip()
+        except subprocess.SubprocessError as e:
+            self.logger.error(f"Error finding amixer: {e}")
             return None
 
     def _verify_sound_file(self, path: Path) -> bool:
@@ -83,6 +100,43 @@ class SoundSystem:
             return wav_path
 
         return None
+
+    def _adjust_volume(self, increase: bool):
+        """Adjust PCM volume"""
+        if not self.amixer_path:
+            self.logger.error("amixer not available")
+            return False
+
+        try:
+            cmd = [self.amixer_path, 'set', 'PCM', '2%+' if increase else '2%-']
+            process = subprocess.run(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=5
+            )
+
+            if process.returncode != 0:
+                self.logger.error(f"Volume adjustment failed: {process.stderr}")
+                return False
+
+            # Extract current volume from amixer output
+            output = process.stdout
+            if 'Playback' in output:
+                try:
+                    volume = output.split('[')[1].split('%')[0]
+                    return f"Volume set to {volume}%"
+                except:
+                    return "Volume adjusted"
+            return "Volume adjusted"
+
+        except subprocess.TimeoutExpired:
+            self.logger.error("Volume adjustment timeout")
+            return False
+        except Exception as e:
+            self.logger.error(f"Volume adjustment error: {e}")
+            return False
 
     def _play_sound_thread(self, sound_path: Path):
         """Handle sound playback in a separate thread"""
@@ -152,6 +206,22 @@ class SoundSystem:
             msg.append(f"Error: {e}")
 
         gcmd.respond_info("\n".join(msg))
+
+    def cmd_VOLUME_UP(self, gcmd):
+        """Increase PCM volume"""
+        result = self._adjust_volume(True)
+        if result:
+            gcmd.respond_info(result)
+        else:
+            raise gcmd.error("Volume adjustment failed")
+
+    def cmd_VOLUME_DOWN(self, gcmd):
+        """Decrease PCM volume"""
+        result = self._adjust_volume(False)
+        if result:
+            gcmd.respond_info(result)
+        else:
+            raise gcmd.error("Volume adjustment failed")
 
 
 def load_config(config):
