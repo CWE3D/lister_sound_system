@@ -78,7 +78,7 @@ class SoundSystem:
         try:
             cmd = [self.amixer_path, '-M', 'sset', 'PCM', f'{volume}%']
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
-            subprocess.run('play -n synth 0.2 sine 600', capture_output=True, text=True, timeout=0.22)
+            # subprocess.run('play -n synth 0.2 sine 600', capture_output=True, text=True, timeout=0.22)
 
             if result.returncode == 0:
                 self._current_volume = volume
