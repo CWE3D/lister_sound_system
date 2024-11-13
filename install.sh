@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# The install script for lister_sound_system
 # Define colors for output
 GREEN='\033[0;32m'
 RED='\033[0;31m'
