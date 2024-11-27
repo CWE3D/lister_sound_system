@@ -58,6 +58,26 @@ update_repo() {
     fi
 }
 
+# Function to update Python dependencies
+update_python_deps() {
+    log_message "Updating Python dependencies..."
+    
+    # Update dependencies in Klippy virtual environment
+    if ! /home/pi/klippy-env/bin/pip install -r "${REPO_DIR}/requirement.txt"; then
+        log_error "Error: Failed to update Python dependencies in Klippy environment"
+        return 1
+    fi
+    
+    # Update dependencies in Moonraker virtual environment
+    if ! /home/pi/moonraker/.venv/bin/pip install -r "${REPO_DIR}/requirement.txt"; then
+        log_error "Error: Failed to update Python dependencies in Moonraker environment"
+        return 1
+    }
+    
+    log_message "Python dependencies updated successfully"
+    return 0
+}
+
 # Function to restart services
 restart_services() {
     log_message "Restarting services..."
@@ -103,7 +123,8 @@ main() {
 
     # Update repository
     if update_repo; then
-        # Only restart services if there were updates
+        # Update Python dependencies
+        update_python_deps
         verify_services
     else
         log_message "No updates found. Skipping service restart."

@@ -3,6 +3,9 @@ import subprocess
 from pathlib import Path
 from threading import Thread
 from typing import Optional
+import psutil
+import signal
+import os
 
 
 class SoundSystem:
@@ -38,6 +41,10 @@ class SoundSystem:
         # Initialize volume state
         self._init_volume_state()
 
+        # Stream handling
+        self.mpv_path = self._get_mpv_path()
+        self._stream_process = None
+
         # Register commands
         self.gcode.register_command('PLAY_SOUND', self.cmd_PLAY_SOUND,
                                     desc="Play a sound file (PLAY_SOUND SOUND=filename)")
@@ -47,6 +54,8 @@ class SoundSystem:
                                     desc=f"Increase PCM volume by {self.volume_step}%")
         self.gcode.register_command('VOLUME_DOWN', self.cmd_VOLUME_DOWN,
                                     desc=f"Decrease PCM volume by {self.volume_step}%")
+        self.gcode.register_command('STREAM_MUSIC', self.cmd_STREAM_MUSIC,
+                                  desc="Toggle music stream playback")
 
     def _init_volume_state(self):
         """Initialize volume state by getting current system volume"""
@@ -245,6 +254,78 @@ class SoundSystem:
             gcmd.respond_info(f"Volume set to {self._current_volume}%")
         else:
             raise gcmd.error("Volume adjustment failed")
+
+    def _get_mpv_path(self):
+        """Find mpv executable path"""
+        try:
+            return subprocess.check_output(['which', 'mpv'],
+                                        text=True).strip()
+        except subprocess.SubprocessError as e:
+            self.logger.error(f"Error finding mpv: {e}")
+            return None
+
+    def _kill_existing_stream(self):
+        """Kill any existing mpv processes"""
+        try:
+            for proc in psutil.process_iter(['pid', 'name']):
+                if proc.info['name'] == 'mpv':
+                    os.kill(proc.info['pid'], signal.SIGTERM)
+                    self.logger.info(f"Killed existing mpv process: {proc.info['pid']}")
+        except Exception as e:
+            self.logger.error(f"Error killing existing stream: {e}")
+
+    def _start_stream_thread(self, url):
+        """Handle stream playback in a separate thread"""
+        try:
+            # Kill any existing stream first
+            if self._stream_process:
+                self._stream_process.terminate()
+                self._stream_process.wait()
+            
+            self._kill_existing_stream()  # Cleanup any orphaned processes
+            
+            # Start new stream
+            self._stream_process = subprocess.Popen(
+                [self.mpv_path, url, '--no-video', '--no-terminal'],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+            self.logger.info(f"Started streaming: {url}")
+            
+        except Exception as e:
+            self.logger.error(f"Stream thread error: {e}")
+            self._stream_process = None
+
+    def cmd_STREAM_MUSIC(self, gcmd):
+        """Handle STREAM_MUSIC command"""
+        if not self.mpv_path:
+            raise gcmd.error("mpv not available")
+
+        # If stream is running, stop it
+        if self._stream_process:
+            try:
+                self._stream_process.terminate()
+                self._stream_process.wait()
+                self._stream_process = None
+                self._kill_existing_stream()  # Cleanup any orphaned processes
+                gcmd.respond_info("Stopped music stream")
+                return
+            except Exception as e:
+                self.logger.error(f"Error stopping stream: {e}")
+                self._stream_process = None
+
+        # Start new stream
+        url = "https://stream.radioparadise.com/mellow-320"
+        
+        def start_stream(eventtime):
+            Thread(target=self._start_stream_thread,
+                  args=(url,),
+                  daemon=True).start()
+            return False  # Don't reschedule
+
+        reactor = self.printer.get_reactor()
+        reactor.register_callback(start_stream)
+        gcmd.respond_info(f"Starting music stream: {url}")
 
 
 def load_config(config):

@@ -1,0 +1,6 @@
+# Core dependencies
+psutil>=5.9.0
+python-mpv>=1.0.0
+
+# Optional but recommended
+typing>=3.7.4.3

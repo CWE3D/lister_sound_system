@@ -111,6 +111,25 @@ install_system_deps() {
     fi
 }
 
+# Install Python dependencies
+install_python_deps() {
+    log_message "Installing Python dependencies..."
+    
+    # Install dependencies in Klippy virtual environment
+    if ! "${KLIPPY_ENV}/bin/pip" install -r "${PLUGIN_DIR}/requirement.txt"; then
+        log_error "Error: Failed to install Python dependencies in Klippy environment"
+        return 1
+    fi
+    
+    # Install dependencies in Moonraker virtual environment
+    if ! "${MOONRAKER_DIR}/.venv/bin/pip" install -r "${PLUGIN_DIR}/requirement.txt"; then
+        log_error "Error: Failed to install Python dependencies in Moonraker environment"
+        return 1
+    }
+    
+    log_message "Python dependencies installed successfully"
+}
+
 # Create sound directory and ensure proper structure
 setup_sound_directory() {
     log_message "Setting up sound directory..."
@@ -263,6 +282,7 @@ main() {
 
     check_directories
     install_system_deps
+    install_python_deps
     setup_sound_directory
     test_audio_system
     setup_klipper_plugin
