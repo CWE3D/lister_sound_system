@@ -42,19 +42,12 @@ update_repo() {
         git clone https://github.com/CWE3D/lister_sound_system.git "$REPO_DIR"
     else
         cd "$REPO_DIR" || exit 1
+        log_message "Resetting local changes..."
+        git reset --hard
+        git clean -fd
         git fetch
-
-        LOCAL=$(git rev-parse @)
-        REMOTE=$(git rev-parse @{u})
-
-        if [ "$LOCAL" != "$REMOTE" ]; then
-            log_message "Updates found. Pulling changes..."
-            git pull
-            return 0
-        else
-            log_message "Already up to date"
-            return 1
-        fi
+        git reset --hard origin/main
+        return 0
     fi
 }
 
