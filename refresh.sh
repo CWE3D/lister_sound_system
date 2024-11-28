@@ -76,32 +76,43 @@ restart_services() {
     log_message "Restarting services..."
     
     # Stop services
-    log_message "Stopping sound system service..."
-    systemctl stop lister_sound_service
+    log_message "Stopping Klipper and Moonraker services..."
+    sudo systemctl stop klipper
+    sudo systemctl stop moonraker
     
     # Small delay to ensure clean shutdown
     sleep 2
     
     # Start services
-    log_message "Starting sound system service..."
-    systemctl start lister_sound_service
+    log_message "Starting Klipper and Moonraker services..."
+    sudo systemctl start klipper
+    sudo systemctl start moonraker
 }
 
 # Function to verify services
 verify_services() {
     local all_good=true
 
-    # Check sound system service
-    if ! systemctl is-active --quiet lister_sound_service; then
-        log_error "Sound system service failed to start"
+    # Check Klipper service
+    if ! systemctl is-active --quiet klipper; then
+        log_error "Klipper service failed to start"
         all_good=false
     else
-        log_message "Sound system service is running"
+        log_message "Klipper service is running"
+    fi
+
+    # Check Moonraker service
+    if ! systemctl is-active --quiet moonraker; then
+        log_error "Moonraker service failed to start"
+        all_good=false
+    else
+        log_message "Moonraker service is running"
     fi
 
     if [ "$all_good" = false ]; then
-        log_error "Service failed to start. Check the logs for details:"
-        log_error "- Sound system log: ${LOG_DIR}/sound_system.log"
+        log_error "Services failed to start. Check the logs for details:"
+        log_error "- Klipper log: ${LOG_DIR}/klippy.log"
+        log_error "- Moonraker log: ${LOG_DIR}/moonraker.log"
         return 1
     fi
 
@@ -187,8 +198,9 @@ main() {
 
     # Print verification steps
     echo -e "\n${GREEN}Verify the services:${NC}"
-    echo -e "1. Check sound system status: ${YELLOW}systemctl status lister_sound_service${NC}"
-    echo -e "2. View sound system logs: ${YELLOW}tail -f ${LOG_DIR}/sound_system.log${NC}"
+    echo -e "1. Check Klipper status: ${YELLOW}systemctl status klipper${NC}"
+    echo -e "2. Check Moonraker status: ${YELLOW}systemctl status moonraker${NC}"
+    echo -e "3. View logs: ${YELLOW}tail -f ${LOG_DIR}/klippy.log ${LOG_DIR}/moonraker.log${NC}"
 }
 
 # Run the update
