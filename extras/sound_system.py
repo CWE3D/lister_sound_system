@@ -44,6 +44,22 @@ class SoundSystem:
         # Stream handling
         self.mpv_path = self._get_mpv_path()
         self._stream_process = None
+        
+        # Get streams from config
+        default_streams = "\n".join([
+            "https://stream.radioparadise.com/mellow-320",
+            "https://stream.radioparadise.com/rock-320",
+            "https://stream.radioparadise.com/eclectic-320"
+        ])
+        streams_config = config.get('radio_streams', default_streams)
+        self.stream_urls = [url.strip() for url in streams_config.splitlines() if url.strip()]
+        
+        if not self.stream_urls:
+            self.logger.warning("No radio streams configured")
+        
+        self.current_stream_index = 0
+        self.last_stream_stop_time = None
+        self.stream_switch_timeout = config.getint('stream_switch_timeout', 60)  # Default 60 seconds
 
         # Register commands
         self.gcode.register_command('PLAY_SOUND', self.cmd_PLAY_SOUND,
@@ -54,8 +70,8 @@ class SoundSystem:
                                     desc=f"Increase PCM volume by {self.volume_step}%")
         self.gcode.register_command('VOLUME_DOWN', self.cmd_VOLUME_DOWN,
                                     desc=f"Decrease PCM volume by {self.volume_step}%")
-        self.gcode.register_command('STREAM_MUSIC', self.cmd_STREAM_MUSIC,
-                                  desc="Toggle music stream playback")
+        self.gcode.register_command('STREAM_RADIO', self.cmd_STREAM_RADIO,
+                                  desc="Toggle radio stream playback")
 
     def _init_volume_state(self):
         """Initialize volume state by getting current system volume"""
@@ -296,10 +312,12 @@ class SoundSystem:
             self.logger.error(f"Stream thread error: {e}")
             self._stream_process = None
 
-    def cmd_STREAM_MUSIC(self, gcmd):
-        """Handle STREAM_MUSIC command"""
+    def cmd_STREAM_RADIO(self, gcmd):
+        """Handle STREAM_RADIO command"""
         if not self.mpv_path:
             raise gcmd.error("mpv not available")
+
+        current_time = self.printer.get_reactor().monotonic()
 
         # If stream is running, stop it
         if self._stream_process:
@@ -308,14 +326,24 @@ class SoundSystem:
                 self._stream_process.wait()
                 self._stream_process = None
                 self._kill_existing_stream()  # Cleanup any orphaned processes
-                gcmd.respond_info("Stopped music stream")
+                self.last_stream_stop_time = current_time
+                gcmd.respond_info("Stopped radio stream")
                 return
             except Exception as e:
                 self.logger.error(f"Error stopping stream: {e}")
                 self._stream_process = None
 
-        # Start new stream
-        url = "https://stream.radioparadise.com/mellow-320"
+        # Check if we should move to next stream or reset to current
+        if (self.last_stream_stop_time is not None and 
+            current_time - self.last_stream_stop_time <= self.stream_switch_timeout):
+            # Within timeout, move to next stream
+            self.current_stream_index = (self.current_stream_index + 1) % len(self.stream_urls)
+        elif self.last_stream_stop_time is not None:
+            # Beyond timeout, keep current stream
+            self.logger.info("Beyond timeout, keeping current stream")
+
+        # Get current URL
+        url = self.stream_urls[self.current_stream_index]
         
         def start_stream(eventtime):
             Thread(target=self._start_stream_thread,
@@ -325,7 +353,7 @@ class SoundSystem:
 
         reactor = self.printer.get_reactor()
         reactor.register_callback(start_stream)
-        gcmd.respond_info(f"Starting music stream: {url}")
+        gcmd.respond_info(f"Starting radio stream ({self.current_stream_index + 1}/{len(self.stream_urls)}): {url}")
 
 
 def load_config(config):
