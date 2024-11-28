@@ -1,5 +1,7 @@
 # Lister Sound System Plugin Documentation
 
+## Version 2.0.1
+
 ## Overview
 The Lister Sound System Plugin enables audio feedback for your 3D printer events through the Raspberry Pi's audio system. Play sounds for print completion, errors, and custom events using either predefined sounds or your own WAV files.
 
