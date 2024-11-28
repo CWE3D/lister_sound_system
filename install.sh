@@ -283,22 +283,26 @@ fix_permissions() {
     # Fix plugin directory permissions
     if [ -d "$PLUGIN_DIR" ]; then
         log_message "Setting permissions for $PLUGIN_DIR"
-        # Fix owner and group recursively
-        sudo chown -R pi:pi "$PLUGIN_DIR"
         
-        # Fix directory permissions
+        # First set all files to non-executable
+        sudo find "$PLUGIN_DIR" -type f -exec chmod 644 {} \;
+        # Set all directories to 755
         sudo find "$PLUGIN_DIR" -type d -exec chmod 755 {} \;
         
-        # Reset all file permissions to 644 first
-        sudo find "$PLUGIN_DIR" -type f -exec chmod 644 {} \;
+        # Set ownership
+        sudo chown -R pi:pi "$PLUGIN_DIR"
         
-        # Let git set the correct executable bits
+        # If it's a git repo, let git handle executable bits
         if [ -d "$PLUGIN_DIR/.git" ]; then
-            (cd "$PLUGIN_DIR" && git diff --quiet || {
-                git reset --hard
-                git config core.fileMode true
-                git checkout --force HEAD
-            })
+            cd "$PLUGIN_DIR" || exit 1
+            git config core.fileMode true
+            
+            # Use git to set executable permissions based on .gitattributes
+            git ls-files --stage | while read mode hash stage file; do
+                if [ "$mode" = "100755" ]; then
+                    chmod +x "$file"
+                fi
+            done
         fi
     fi
 
