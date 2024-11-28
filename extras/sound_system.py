@@ -186,32 +186,31 @@ class SoundSystem:
     def _play_sound_thread(self, sound_path: Path):
         """Handle sound playback in a separate thread"""
         try:
+            # Set flag before starting playback
             self._sound_playing = True
             
-            # Use subprocess.Popen instead of os.popen for better process management
             process = subprocess.Popen(
                 [self.aplay_path, '-D', 'plughw:0,0', str(sound_path)],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE
             )
 
-            # Non-blocking wait with timeout
-            try:
-                stdout, stderr = process.communicate(timeout=30)  # 30 second timeout
-                if process.returncode != 0:
-                    self.logger.error(
-                        f"Play failed (code {process.returncode}): {stderr.decode()}")
-                else:
-                    self.logger.debug("Play completed successfully")
+            # Wait for the process to complete
+            stdout, stderr = process.communicate(timeout=30)  # 30 second timeout
+            if process.returncode != 0:
+                self.logger.error(
+                    f"Play failed (code {process.returncode}): {stderr.decode()}")
+            else:
+                self.logger.debug("Play completed successfully")
 
-            except subprocess.TimeoutExpired:
-                self.logger.error("Play timeout - killing process")
-                process.kill()
-                process.communicate()  # Clean up
-
+        except subprocess.TimeoutExpired:
+            self.logger.error("Play timeout - killing process")
+            process.kill()
+            process.communicate()  # Clean up
         except Exception as e:
             self.logger.error(f"Play thread error: {e}")
         finally:
+            # Clear flag after playback is complete or on error
             self._sound_playing = False
 
     def cmd_PLAY_SOUND(self, gcmd):
@@ -219,9 +218,10 @@ class SoundSystem:
         if not self.aplay_path:
             raise gcmd.error("aplay not available")
 
-        # Check if sound is already playing
+        # Strict check for ongoing playback
         if self._sound_playing:
-            gcmd.respond_info("Sound already playing, skipping new request")
+            self.logger.info("Sound already playing, ignoring new request")
+            gcmd.respond_info("Sound already playing, request ignored")
             return
 
         sound_name = gcmd.get('SOUND')
@@ -234,14 +234,16 @@ class SoundSystem:
 
         # Start playback in a separate thread
         def start_playback(eventtime):
-            Thread(target=self._play_sound_thread,
-                   args=(sound_path,),
-                   daemon=True).start()
+            # Double-check the flag right before starting the thread
+            if not self._sound_playing:
+                Thread(target=self._play_sound_thread,
+                      args=(sound_path,),
+                      daemon=True).start()
+                gcmd.respond_info(f"Playing sound: {sound_path.name}")
             return False  # Don't reschedule
 
         reactor = self.printer.get_reactor()
         reactor.register_callback(start_playback)
-        gcmd.respond_info(f"Playing sound: {sound_path.name}")
 
     def cmd_SOUND_LIST(self, gcmd):
         """List available sound files"""
