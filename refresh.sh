@@ -116,10 +116,10 @@ fix_permissions() {
     if [ -d "$REPO_DIR" ]; then
         log_message "Setting permissions for $REPO_DIR"
         
-        # First set all files to non-executable
-        sudo find "$REPO_DIR" -type f -exec chmod 644 {} \;
-        # Set all directories to 755
+        # Set all directories to 755 first
         sudo find "$REPO_DIR" -type d -exec chmod 755 {} \;
+        # Then set all files to non-executable
+        sudo find "$REPO_DIR" -type f -exec chmod 644 {} \;
         
         # Set ownership
         sudo chown -R pi:pi "$REPO_DIR"
