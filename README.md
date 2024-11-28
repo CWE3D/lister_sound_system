@@ -1,6 +1,6 @@
 # Lister Sound System Plugin Documentation
 
-## Version 2.1.0
+## Version 2.2.0
 
 ## Overview
 The Lister Sound System Plugin enables audio feedback for your 3D printer events through the Raspberry Pi's audio system. Play sounds for print completion, errors, and custom events using either predefined sounds or your own WAV files.
@@ -9,6 +9,7 @@ The Lister Sound System Plugin enables audio feedback for your 3D printer events
 - Asynchronous sound playback (won't interrupt printer operations)
 - Support for predefined and custom WAV files
 - Web API integration through Moonraker
+- Internet radio streaming with multiple stations
 - Easy installation and configuration
 - Real-time sound scanning and caching
 - System audio verification
@@ -57,6 +58,24 @@ SOUND_LIST
 
 ## Configuration
 
+### Basic Configuration
+```ini
+[sound_system]
+sound_directory: ~/lister_sound_system/sounds
+# Optional settings:
+stream_switch_timeout: 60    # Timeout in seconds for radio station switching
+volume_step: 5              # Volume adjustment step (percentage)
+max_volume: 100            # Maximum volume level
+min_volume: 0              # Minimum volume level
+
+# Configure radio streams (one per line)
+radio_streams:
+    https://stream.radioparadise.com/mellow-320
+    https://stream.radioparadise.com/rock-320
+    https://stream.radioparadise.com/eclectic-320
+    # Add more streams as needed
+```
+
 ### Default Sound Events
 The plugin comes with several predefined sound events:
 - `print_start` - When a print begins
@@ -95,6 +114,36 @@ PLAY_SOUND SOUND=print_complete
 ```gcode
 PLAY_SOUND SOUND=my-custom.wav
 ```
+
+### Radio Streaming Commands
+
+1. Toggle radio playback:
+```gcode
+STREAM_RADIO
+```
+This command:
+- Starts playing the first stream when no stream is active
+- Stops the current stream if one is playing
+- Switches to the next stream if restarted within the timeout period (default 60s)
+- Returns to the first stream if restarted after the timeout period
+
+2. Adjust volume:
+```gcode
+VOLUME_UP   # Increase volume by configured step
+VOLUME_DOWN # Decrease volume by configured step
+```
+
+### Radio Stream Behavior
+- First `STREAM_RADIO` command starts playing the first configured stream
+- Second `STREAM_RADIO` command stops the current stream
+- If you issue `STREAM_RADIO` again within the timeout period (default 60s), it plays the next stream in the list
+- If you wait longer than the timeout period, the next `STREAM_RADIO` command will start with the first stream again
+- The system shows which stream is currently playing (e.g., "1/3")
+
+### Sound Playback Behavior
+- The system prevents multiple sounds from playing simultaneously
+- If a sound is already playing when PLAY_SOUND is called, the new request will be skipped
+- A message will inform you if a sound request was skipped
 
 ### Integration with Macros
 
@@ -202,6 +251,28 @@ If you encounter permission issues:
 sudo chown -R pi:pi ~/lister_sound_system/sounds/
 sudo chmod -R 755 ~/lister_sound_system/sounds/
 ```
+
+### Radio Streaming Issues
+
+1. **"mpv not available" error**
+   - Install mpv:
+   ```bash
+   sudo apt-get install mpv
+   ```
+
+2. **No radio playback**
+   - Verify internet connection
+   - Check stream URLs are valid
+   - Ensure mpv is installed and working
+   - Test stream directly:
+   ```bash
+   mpv --no-video --no-terminal [stream_url]
+   ```
+
+3. **Stream switching not working**
+   - Verify stream_switch_timeout setting
+   - Check if multiple streams are configured
+   - Ensure URLs are properly formatted in printer.cfg
 
 ## System Maintenance
 
