@@ -108,16 +108,64 @@ verify_services() {
     return 0
 }
 
+# Add this function after the log functions
+fix_permissions() {
+    log_message "Running final permission check for all components..."
+
+    # Fix repository directory permissions
+    if [ -d "$REPO_DIR" ]; then
+        log_message "Setting permissions for $REPO_DIR"
+        # Fix owner and group recursively
+        sudo chown -R pi:pi "$REPO_DIR"
+        
+        # Fix directory permissions
+        sudo find "$REPO_DIR" -type d -exec chmod 755 {} \;
+        
+        # Reset all file permissions to 644 first
+        sudo find "$REPO_DIR" -type f -exec chmod 644 {} \;
+        
+        # Let git set the correct executable bits
+        if [ -d "$REPO_DIR/.git" ]; then
+            (cd "$REPO_DIR" && git diff --quiet || {
+                git reset --hard
+                git config core.fileMode true
+                git checkout --force HEAD
+            })
+        fi
+    fi
+
+    # Fix symlink permissions
+    if [ -L "/home/pi/klipper/klippy/extras/sound_system.py" ]; then
+        sudo chown -h pi:pi "/home/pi/klipper/klippy/extras/sound_system.py"
+    fi
+    if [ -L "/home/pi/moonraker/moonraker/components/sound_system_service.py" ]; then
+        sudo chown -h pi:pi "/home/pi/moonraker/moonraker/components/sound_system_service.py"
+    fi
+
+    # Fix log directory
+    log_message "Fixing permissions for log directory"
+    sudo chown -R pi:pi "$LOG_DIR"
+    sudo chmod 755 "$LOG_DIR"
+    sudo chmod 644 "$UPDATE_LOG"
+
+    # Fix sound directory
+    if [ -d "$REPO_DIR/sounds" ]; then
+        log_message "Setting permissions for sound directory"
+        sudo chown -R pi:pi "$REPO_DIR/sounds"
+        sudo find "$REPO_DIR/sounds" -type d -exec chmod 755 {} \;
+        sudo find "$REPO_DIR/sounds" -type f -exec chmod 644 {} \;
+    fi
+}
+
 # Main update process
 main() {
     log_message "Starting sound system update process..."
 
     check_root
 
-    # Update repository
     if update_repo; then
-        # Update Python dependencies
         update_python_deps
+        fix_permissions
         verify_services
     else
         log_message "No updates found. Skipping service restart."

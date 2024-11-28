@@ -276,6 +276,55 @@ print_help() {
     echo -e "\nSound files should be placed in: ${YELLOW}${SOUND_DIR}${NC}"
 }
 
+# Add this function after the log functions
+fix_permissions() {
+    log_message "Running final permission check for all components..."
+
+    # Fix plugin directory permissions
+    if [ -d "$PLUGIN_DIR" ]; then
+        log_message "Setting permissions for $PLUGIN_DIR"
+        # Fix owner and group recursively
+        sudo chown -R pi:pi "$PLUGIN_DIR"
+        
+        # Fix directory permissions
+        sudo find "$PLUGIN_DIR" -type d -exec chmod 755 {} \;
+        
+        # Reset all file permissions to 644 first
+        sudo find "$PLUGIN_DIR" -type f -exec chmod 644 {} \;
+        
+        # Let git set the correct executable bits
+        if [ -d "$PLUGIN_DIR/.git" ]; then
+            (cd "$PLUGIN_DIR" && git diff --quiet || {
+                git reset --hard
+                git config core.fileMode true
+                git checkout --force HEAD
+            })
+        fi
+    fi
+
+    # Fix symlink permissions
+    if [ -L "${KLIPPER_DIR}/klippy/extras/sound_system.py" ]; then
+        sudo chown -h pi:pi "${KLIPPER_DIR}/klippy/extras/sound_system.py"
+    fi
+    if [ -L "${MOONRAKER_DIR}/moonraker/components/sound_system_service.py" ]; then
+        sudo chown -h pi:pi "${MOONRAKER_DIR}/moonraker/components/sound_system_service.py"
+    fi
+
+    # Fix config and log directories
+    log_message "Fixing permissions for config and log directories"
+    sudo chown -R pi:pi "$CONFIG_DIR" "$LOG_DIR"
+    sudo chmod 755 "$CONFIG_DIR" "$LOG_DIR"
+    sudo chmod 644 "$INSTALL_LOG"
+
+    # Fix sound directory specifically
+    if [ -d "$SOUND_DIR" ]; then
+        log_message "Setting permissions for sound directory"
+        sudo chown -R pi:pi "$SOUND_DIR"
+        sudo find "$SOUND_DIR" -type d -exec chmod 755 {} \;
+        sudo find "$SOUND_DIR" -type f -exec chmod 644 {} \;
+    fi
+}
+
 # Main installation process
 main() {
     log_message "Starting Lister Sound System installation..."
@@ -288,6 +337,7 @@ main() {
     setup_klipper_plugin
     setup_moonraker_component
     update_moonraker_conf
+    fix_permissions
     verify_installation
     restart_services
 
