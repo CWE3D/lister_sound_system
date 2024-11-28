@@ -122,7 +122,7 @@ install_python_deps() {
     fi
     
     # Install dependencies in Moonraker virtual environment
-    if ! "${MOONRAKER_DIR}/.venv/bin/pip" install -r "${PLUGIN_DIR}/requirement.txt"; then
+    if ! "/home/pi/moonraker-env/bin/pip" install -r "${PLUGIN_DIR}/requirement.txt"; then
         log_error "Error: Failed to install Python dependencies in Moonraker environment"
         return 1
     fi

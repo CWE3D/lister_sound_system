@@ -62,7 +62,7 @@ update_python_deps() {
     fi
     
     # Update dependencies in Moonraker virtual environment
-    if ! /home/pi/moonraker/.venv/bin/pip install -r "${REPO_DIR}/requirement.txt"; then
+    if ! /home/pi/moonraker-env/bin/pip install -r "${REPO_DIR}/requirement.txt"; then
         log_error "Error: Failed to update Python dependencies in Moonraker environment"
         return 1
     fi
