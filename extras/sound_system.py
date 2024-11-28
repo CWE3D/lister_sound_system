@@ -73,6 +73,9 @@ class SoundSystem:
         self.gcode.register_command('STREAM_RADIO', self.cmd_STREAM_RADIO,
                                   desc="Toggle radio stream playback")
 
+        # Add sound playback state tracking
+        self._sound_playing = False
+
     def _init_volume_state(self):
         """Initialize volume state by getting current system volume"""
         try:
@@ -183,6 +186,8 @@ class SoundSystem:
     def _play_sound_thread(self, sound_path: Path):
         """Handle sound playback in a separate thread"""
         try:
+            self._sound_playing = True
+            
             # Use subprocess.Popen instead of os.popen for better process management
             process = subprocess.Popen(
                 [self.aplay_path, '-D', 'plughw:0,0', str(sound_path)],
@@ -206,11 +211,18 @@ class SoundSystem:
 
         except Exception as e:
             self.logger.error(f"Play thread error: {e}")
+        finally:
+            self._sound_playing = False
 
     def cmd_PLAY_SOUND(self, gcmd):
         """Handle PLAY_SOUND command"""
         if not self.aplay_path:
             raise gcmd.error("aplay not available")
+
+        # Check if sound is already playing
+        if self._sound_playing:
+            gcmd.respond_info("Sound already playing, skipping new request")
+            return
 
         sound_name = gcmd.get('SOUND')
         if not sound_name:
