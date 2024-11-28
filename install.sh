@@ -284,10 +284,14 @@ fix_permissions() {
     if [ -d "$PLUGIN_DIR" ]; then
         log_message "Setting permissions for $PLUGIN_DIR"
         
-        # First set all files to non-executable
-        sudo find "$PLUGIN_DIR" -type f -exec chmod 644 {} \;
-        # Set all directories to 755
+        # Make sure install.sh and refresh.sh stay executable before setting other permissions
+        chmod +x "$PLUGIN_DIR/install.sh"
+        chmod +x "$PLUGIN_DIR/refresh.sh"
+        
+        # Set all directories to 755 first
         sudo find "$PLUGIN_DIR" -type d -exec chmod 755 {} \;
+        # Then set all files to non-executable
+        sudo find "$PLUGIN_DIR" -type f -exec chmod 644 {} \;
         
         # Set ownership
         sudo chown -R pi:pi "$PLUGIN_DIR"
@@ -304,6 +308,10 @@ fix_permissions() {
                 fi
             done
         fi
+        
+        # Make absolutely sure both scripts are executable after all operations
+        chmod +x "$PLUGIN_DIR/install.sh"
+        chmod +x "$PLUGIN_DIR/refresh.sh"
     fi
 
     # Fix symlink permissions

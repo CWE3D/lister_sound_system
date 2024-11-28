@@ -116,6 +116,9 @@ fix_permissions() {
     if [ -d "$REPO_DIR" ]; then
         log_message "Setting permissions for $REPO_DIR"
         
+        # Make sure refresh.sh stays executable before setting other permissions
+        chmod +x "$REPO_DIR/refresh.sh"
+        
         # Set all directories to 755 first
         sudo find "$REPO_DIR" -type d -exec chmod 755 {} \;
         # Then set all files to non-executable
@@ -136,6 +139,9 @@ fix_permissions() {
                 fi
             done
         fi
+        
+        # Make absolutely sure refresh.sh is executable after all operations
+        chmod +x "$REPO_DIR/refresh.sh"
     fi
 
     # Fix symlink permissions
