@@ -218,8 +218,11 @@ class SoundSystem:
         if not self.aplay_path:
             raise gcmd.error("aplay not available")
 
-        # Strict check for ongoing playback
-        if self._sound_playing:
+        # Check if NOW flag is set
+        force_now = gcmd.get_int('NOW', 0)
+
+        # Strict check for ongoing playback, unless NOW is set
+        if self._sound_playing and not force_now:
             self.logger.info("Sound already playing, ignoring new request")
             gcmd.respond_info("Sound already playing, request ignored")
             return
@@ -232,10 +235,22 @@ class SoundSystem:
         if not sound_path:
             raise gcmd.error(f"Sound file not found: {sound_name}")
 
+        # If NOW is set and there's a sound playing, kill existing playback
+        if force_now and self._sound_playing:
+            self.logger.info("Force playing new sound, stopping current playback")
+            try:
+                for proc in psutil.process_iter(['pid', 'name']):
+                    if proc.info['name'] == 'aplay':
+                        os.kill(proc.info['pid'], signal.SIGTERM)
+                        self.logger.info(f"Killed existing aplay process: {proc.info['pid']}")
+                self._sound_playing = False
+            except Exception as e:
+                self.logger.error(f"Error killing existing sound: {e}")
+
         # Start playback in a separate thread
         def start_playback(eventtime):
-            # Double-check the flag right before starting the thread
-            if not self._sound_playing:
+            # Double-check the flag right before starting the thread, unless NOW is set
+            if not self._sound_playing or force_now:
                 Thread(target=self._play_sound_thread,
                       args=(sound_path,),
                       daemon=True).start()

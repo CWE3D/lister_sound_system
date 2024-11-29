@@ -14,6 +14,11 @@ The Lister Sound System Plugin enables audio feedback for your 3D printer events
 - Real-time sound scanning and caching
 - System audio verification
 
+## Sound generation
+Main voice:
+John Doe - Intimate
+https://elevenlabs.io/app/speech-synthesis/text-to-speech
+
 ## Installation
 
 ### Prerequisites
